@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">FUpk3</string>
+    <string name="action_settings">Settings</string>
+    <string name="secret_friend_search_hint">搜索</string>
+</resources>

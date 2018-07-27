@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#3F51B5</color>
+    <color name="colorPrimaryDark">#303F9F</color>
+    <color name="colorAccent">#FF4081</color>
+
+    <color name="white">#ffffffff</color>
+    <color name="yellow_page_search_bg">#fffffbfa</color>
+    <color name="transparent">#00000000</color>
+    <color name="login_form_hint">#ffb5b5b5</color>
+    <color name="black">#ff000000</color>
+    <color name="yellow_light">#ffefa717</color>
+
+    <color name="unpack_success">#0153f7</color>
+    <color name="unpack_error">#f20303</color>
+</resources>

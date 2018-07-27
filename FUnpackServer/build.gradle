@@ -1,0 +1,191 @@
+/*
+ * Copyright 2012, Google Inc.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above
+ * copyright notice, this list of conditions and the following disclaimer
+ * in the documentation and/or other materials provided with the
+ * distribution.
+ *     * Neither the name of Google Inc. nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+apply plugin: 'idea'
+
+version = '2.2.3'
+def jcommanderVersion = ''
+
+if (!('release' in gradle.startParameter.taskNames)) {
+    // we compile against 1.48 normally, to match what's in AOSP, but switch to a newer version
+    // for release, because it has some fixes required when running on Android
+    jcommanderVersion = 'com.beust:jcommander:1.48'
+
+    def versionSuffix
+    try {
+        def git = org.eclipse.jgit.api.Git.open(file('.'))
+        def head = git.getRepository().getRef('HEAD')
+        versionSuffix = head.getObjectId().abbreviate(8).name()
+
+        if (!git.status().call().clean) {
+            versionSuffix += '-dirty'
+        }
+    } catch (Exception) {
+        // In case we can't get the commit for some reason,
+        // just use -dev
+        versionSuffix = 'dev'
+    }
+
+    version += "-${versionSuffix}"
+} else {
+    jcommanderVersion = 'com.beust:jcommander:1.64'
+}
+
+// Note: please don't use this. This is strictly for the official releases
+// that are posted on, e.g. the bitbucket download page.
+task release() {
+}
+
+task(install) << {
+    println "Installing version: ${version}"
+}
+
+// The projects that get pushed to maven
+def maven_release_projects = ['smali', 'baksmali', 'dexlib2', 'util']
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'idea'
+
+    if (JavaVersion.current().isJava8Compatible()) {
+        allprojects {
+            tasks.withType(Javadoc) {
+                options.addStringOption('Xdoclint:none', '-quiet')
+            }
+        }
+    }
+
+    version = parent.version
+
+    ext {
+        depends = [
+                guava: 'com.google.guava:guava:18.0',
+                findbugs: 'com.google.code.findbugs:jsr305:1.3.9',
+                junit: 'junit:junit:4.6',
+                mockito: 'org.mockito:mockito-core:1.10.19',
+                antlr_runtime: 'org.antlr:antlr-runtime:3.5.2',
+                antlr: 'org.antlr:antlr:3.5.2',
+                stringtemplate: 'org.antlr:stringtemplate:3.2.1',
+                jflex_plugin: 'org.xbib.gradle.plugin:gradle-plugin-jflex:1.1.0',
+                proguard_gradle: 'net.sf.proguard:proguard-gradle:5.2.1',
+                dx: 'com.google.android.tools:dx:1.7',
+                gson: 'com.google.code.gson:gson:2.3.1',
+                jcommander: jcommanderVersion
+        ]
+    }
+
+    repositories {
+        mavenCentral()
+    }
+
+    if (project.name in maven_release_projects) {
+        apply plugin: 'maven'
+        apply plugin: 'signing'
+
+        group = 'org.smali'
+
+        task javadocJar(type: Jar, dependsOn: javadoc) {
+            classifier = 'javadoc'
+            from 'build/docs/javadoc'
+        }
+
+        task sourcesJar(type: Jar) {
+            classifier = 'sources'
+            from sourceSets.main.allJava
+        }
+
+        artifacts {
+            archives javadocJar
+            archives sourcesJar
+        }
+
+        signing {
+            required { gradle.taskGraph.hasTask('uploadArchives') }
+            sign configurations.archives
+        }
+
+        uploadArchives {
+            repositories.mavenDeployer {
+                configuration = configurations.archives
+
+                beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+                if (rootProject.hasProperty('sonatypeUsername') && rootProject.hasProperty('sonatypePassword')) {
+                    repository(url: 'https://oss.sonatype.org/service/local/staging/deploy/maven2/') {
+                        authentication(userName: sonatypeUsername, password: sonatypePassword)
+                    }
+                }
+
+                pom.artifactId = project.name
+
+                pom.project {
+                    name project.name
+                    url 'http://smali.org'
+                    packaging 'jar'
+                    licenses {
+                        license {
+                            name 'The BSD 3-Clause License'
+                            url 'http://opensource.org/licenses/BSD-3-Clause'
+                            distribution 'repo'
+                        }
+                    }
+                    scm {
+                        connection 'scm:git:git://github.com/JesusFreke/smali.git'
+                        developerConnection 'scm:git:git@github.com:JesusFreke/smali.git'
+                    }
+                    developers {
+                        developer {
+                            id 'jesusfreke'
+                            name 'Ben Gruver'
+                            email 'jesusfreke@jesusfreke.com'
+                        }
+                    }
+                }
+            }
+        }
+
+        tasks.getByPath(':release').dependsOn(uploadArchives)
+    }
+}
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.eclipse.jgit:org.eclipse.jgit:2.0.0.201206130900-r'
+    }
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '3.5'
+    distributionType = Wrapper.DistributionType.ALL
+}
