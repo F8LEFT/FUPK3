@@ -12,7 +12,7 @@
 #include <android/log.h>
 
 #ifndef FLOG_TAG
-//#define FORCE_LOG
+#define FORCE_LOG
 
 // 补充一些Android的定义
 #if !defined(NDEBUG) || defined(FORCE_LOG)

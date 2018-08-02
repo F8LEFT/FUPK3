@@ -1,0 +1,32 @@
+diff --git a/core/java/android/app/ActivityThread.java b/core/java/android/app/ActivityThread.java
+index 4825c56bab2..2c9c50b3d4c 100644
+--- a/core/java/android/app/ActivityThread.java
++++ b/core/java/android/app/ActivityThread.java
+@@ -118,6 +118,9 @@ import libcore.io.IoUtils;
+ 
+ import dalvik.system.CloseGuard;
+ 
++import android.app.fupk3.UpkConfig;
++import android.app.fupk3.Fupk;
++
+ final class RemoteServiceException extends AndroidRuntimeException {
+     public RemoteServiceException(String msg) {
+         super(msg);
+@@ -4207,6 +4210,17 @@ public final class ActivityThread {
+                       + " can be debugged on port 8100...");
+             }
+         }
++        // @F8LEFT, now try to load FUPK config. just after debugger connected
++        try {
++            UpkConfig config = new UpkConfig();
++            if (config.load() && config.mTargetPackage.equals(data.info.getPackageName())) {
++                Fupk upk = new Fupk(config.mTargetPackage);
++                upk.unpackAfter(10000);
++            }
++        } catch (Throwable t) {
++        }
++        
++        // @F8LEFT, end
+ 
+         // Enable OpenGL tracing if required
+         if (data.enableOpenGlTrace) {

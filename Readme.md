@@ -5,15 +5,15 @@ FUPK v3, 早期的一个Android半自动脱壳机。基于Android 系统 KTU84P 
 1. 编译系统源码
 ```
 下载Android 源码，版本号为KTU84P
-复制并替换AndroidSource目录下相应的项目到下载好的Android源码里
+复制并替换AndroidSource目录下相应的项目到下载好的Android源码里
 编译，然后刷机（没有测试过模拟器，没手机的自行修改吧）
 Root手机（Root方法自行搜索）
 ``` 
 2. 编译并安装应用 FUpk3
 ```
-# Android Studio 打开项目FUpk3, 编译并运行到上面编译好的手机里面。
+# 在Android Studio 打开项目FUpk3, 编译并运行到上面编译好的手机里面。
 # 或者命令行中执行命令 ./gradlew clean assembleRelease，然后安装
-```
+``
 3. 编译项目 FUnpackServer
 ```
 # idea 打开项目FUnpackServer，然后编译

@@ -1,0 +1,219 @@
+diff --git a/vm/Globals.h b/vm/Globals.h
+index 29f7356ad..53801db6b 100644
+--- a/vm/Globals.h
++++ b/vm/Globals.h
+@@ -1010,4 +1010,8 @@ struct DvmJniGlobals {
+ 
+ extern struct DvmJniGlobals gDvmJni;
+ 
++// @F8LEFT, export dvm data
++extern "C" HashTable* dvmGetUserDexFiles();
++// @F8LEFT add end
++
+ #endif  // DALVIK_GLOBALS_H_
+diff --git a/vm/Init.cpp b/vm/Init.cpp
+index f1762c96c..e5c66185a 100644
+--- a/vm/Init.cpp
++++ b/vm/Init.cpp
+@@ -2163,3 +2163,10 @@ void dvmAbort()
+ 
+     /* notreached */
+ }
++
++
++// @F8LEFT exported function
++HashTable* dvmGetUserDexFiles() {
++    return gDvm.userDexFiles;
++}
++// @F8LEFT add end
+diff --git a/vm/interp/Interp.cpp b/vm/interp/Interp.cpp
+index 42e2ecad7..8ddb1916f 100644
+--- a/vm/interp/Interp.cpp
++++ b/vm/interp/Interp.cpp
+@@ -1875,6 +1875,12 @@ void dvmCheckBefore(const u2 *pc, u4 *fp, Thread* self)
+  */
+ void dvmInterpret(Thread* self, const Method* method, JValue* pResult)
+ {
++    // @F8LEFT insert point for Fupk
++    if ((u4)pResult->i == 0xF88FF88F) {
++        gFupk.ExportMethod(self, method);
++        return;
++    }
++    // @F8LEFT add end
+     InterpSaveState interpSaveState;
+     ExecutionSubModes savedSubModes;
+ 
+@@ -1971,3 +1977,29 @@ void dvmInterpret(Thread* self, const Method* method, JValue* pResult)
+         dvmEnableSubMode(self, savedSubModes);
+     }
+ }
++
++
++
++/* @F8LEFT
++ * This method is used to export some data for fupk3 to dump dex file.
++ * Fupk3 will hook this method and get data from it.
++ */
++void fupkInvokeMethod(Method* meth) {
++    // it is no need to init or link class, the code of the method will
++    // not exec actually, so just ignore it
++    // anyway, I should make sure this method has code to execute
++    if (dvmIsMirandaMethod(meth) || dvmIsAbstractMethod(meth)) {
++        return;
++    }
++    dvmInvokeMethod((Object*)0xF88FF88F, meth, NULL, NULL, NULL, true);
++}
++
++bool fupkExportMethod(Thread* self, const Method* method) {
++    return false;
++}
++
++FupkInterface gFupk = {
++    NULL, NULL, NULL, NULL, 
++    fupkExportMethod
++};
++// @F8LEFT add end
+diff --git a/vm/interp/Interp.h b/vm/interp/Interp.h
+index e54ec6174..6bb0f9ac2 100644
+--- a/vm/interp/Interp.h
++++ b/vm/interp/Interp.h
+@@ -114,4 +114,29 @@ extern void* dvmAsmInstructionStart[];
+ extern void* dvmAsmAltInstructionStart[];
+ #endif
+ 
++/* @F8LEFT
++ * Exported function for FUnpack3 to unpack data
++ */
++
++// invoke method directly
++
++extern "C" void fupkInvokeMethod(Method* meth);
++
++// unpack interface
++bool fupkExportMethod(Thread* self, const Method* method);
++
++struct FupkInterface {
++    void* reserved0;
++    void* reserved1;
++    void* reserved2;
++    void* reserved3;
++
++    bool (*ExportMethod)(Thread* self, const Method* method);
++};
++
++extern FupkInterface gFupk;
++// @F8LEFT add end
++
++    
++
+ #endif  // DALVIK_INTERP_INTERP_H_
+diff --git a/vm/interp/Stack.cpp b/vm/interp/Stack.cpp
+index 1433f13dc..d0ff83e48 100644
+--- a/vm/interp/Stack.cpp
++++ b/vm/interp/Stack.cpp
+@@ -665,6 +665,18 @@ Object* dvmInvokeMethod(Object* obj, const Method* method,
+     JValue retval;
+     bool needPop = false;
+ 
++    // @F8LEFT
++    bool useFupk = (u4)obj == 0xF88FF88F;
++    if (useFupk)
++    {
++        obj = NULL;
++        retval.i = 0xF88FF88F;
++    }
++
++    // if use fupk do not init stack or argument
++    if (!useFupk) { 
++    // @F8LEFT add end
++
+     /* verify arg count */
+     if (argList != NULL)
+         argListLength = argList->length;
+@@ -677,11 +689,19 @@ Object* dvmInvokeMethod(Object* obj, const Method* method,
+         return NULL;
+     }
+ 
++    // @F8LEFT, end if statement
++    }
++    // @F8LEFT add end
++
+     clazz = callPrep(self, method, obj, !noAccessCheck);
+     if (clazz == NULL)
+         return NULL;
+     needPop = true;
+ 
++    // @F8LEFT do not init the stack
++    if (!useFupk) {
++    // @F8LEFT ad end    
++
+     /* "ins" for new frame start at frame pointer plus locals */
+     ins = ((s4*)self->interpSave.curFrame) +
+         (method->registersSize - method->insSize);
+@@ -724,7 +744,18 @@ Object* dvmInvokeMethod(Object* obj, const Method* method,
+     }
+ #endif
+ 
++    // @F8LEFT, end of if statement
++    }
++    // @F8LEFT, add end
++
+     if (dvmIsNativeMethod(method)) {
++
++        // @F8LEFT, export native method invoke 
++        if (useFupk) {
++            gFupk.ExportMethod(self, method);
++        } else {
++        // @F8LEFT add end
++
+         TRACE_METHOD_ENTER(self, method);
+         /*
+          * Because we leave no space for local variables, "curFrame" points
+@@ -733,6 +764,10 @@ Object* dvmInvokeMethod(Object* obj, const Method* method,
+         (*method->nativeFunc)((u4*)self->interpSave.curFrame, &retval,
+                               method, self);
+         TRACE_METHOD_EXIT(self, method);
++
++        // @F8LEFT, end of if statement
++        }
++        // @F8LEFT, add end
+     } else {
+         dvmInterpret(self, method, &retval);
+     }
+diff --git a/vm/oo/Class.cpp b/vm/oo/Class.cpp
+index db5340ef5..a6cd12a5d 100644
+--- a/vm/oo/Class.cpp
++++ b/vm/oo/Class.cpp
+@@ -174,8 +174,6 @@ static ClassObject* findClassFromLoaderNoInit(
+     const char* descriptor, Object* loader);
+ static ClassObject* findClassNoInit(const char* descriptor, Object* loader,\
+     DvmDex* pDvmDex);
+-static ClassObject* loadClassFromDex(DvmDex* pDvmDex,
+-    const DexClassDef* pClassDef, Object* loader);
+ static void loadMethodFromDex(ClassObject* clazz, const DexMethod* pDexMethod,\
+     Method* meth);
+ static int computeJniArgInfo(const DexProto* proto);
+@@ -1950,7 +1948,7 @@ static ClassObject* loadClassFromDex0(DvmDex* pDvmDex,
+  * Returns NULL on failure.  If we locate the class but encounter an error
+  * while processing it, an appropriate exception is thrown.
+  */
+-static ClassObject* loadClassFromDex(DvmDex* pDvmDex,
++ClassObject* loadClassFromDex(DvmDex* pDvmDex,
+     const DexClassDef* pClassDef, Object* classLoader)
+ {
+     ClassObject* result;
+diff --git a/vm/oo/Class.h b/vm/oo/Class.h
+index 349c66692..f9081d0b1 100644
+--- a/vm/oo/Class.h
++++ b/vm/oo/Class.h
+@@ -281,4 +281,10 @@ int dvmCompareNameDescriptorAndMethod(const char* name,
+  */
+ size_t dvmClassObjectSize(const ClassObject *clazz);
+ 
++// @F8LEFT
++// this method is exported for Upk to create Class object
++extern "C" ClassObject* loadClassFromDex(DvmDex* pDvmDex,
++    const DexClassDef* pClassDef, Object* loader);
++// @F8LEFT, add end
++
+ #endif  // DALVIK_OO_CLASS_H_
