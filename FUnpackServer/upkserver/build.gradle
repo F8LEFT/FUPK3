@@ -1,0 +1,40 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath depends.proguard_gradle
+    }
+}
+
+dependencies {
+    compile project(':baksmali')
+    compile project(':smali')
+    compile depends.jcommander
+}
+
+processResources.inputs.property('version', version)
+processResources.expand('version': version)
+
+// Build a separate jar that contaions all dependencies
+task fatJar(type: Jar) {
+    from sourceSets.main.output
+    from { configurations.compile.collect { it.isDirectory() ? it: zipTree(it) } }
+
+    classifier = 'fat'
+
+    manifest {
+        attributes('Main-Class': 'f8left.upk.Main')
+    }
+    doLast {
+        if (!System.getProperty('os.name').toLowerCase().contains('windows')) {
+            ant.symlink(link: file("${destinationDir}/server.jar"), resource: archivePath, overwrite: true)
+        }
+    }
+}
+tasks.getByPath('build').dependsOn(fatJar)
+task fastbuild(dependsOn: build) {
+}
+
+task fb(dependsOn: fastbuild) {
+}

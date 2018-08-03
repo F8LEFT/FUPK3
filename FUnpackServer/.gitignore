@@ -13,8 +13,9 @@
 /smali/out
 /util/out
 /smalidea/out
+/upkserver/out
+/upkserver/build
 *.iml
 *.ipr
 *.iws
 .idea
-/upkserver
