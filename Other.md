@@ -1,4 +1,4 @@
-Android代码是开源的，那么通过直接修改Android源码，把运行时的所有dex数据dump出来，不就可以实现一个通用的脱壳机了吗？那么我们来看一下FUPK3是怎么工作的吧。FUPK3需要修改Android源码，导出数据接口.不过，最为核心的脱壳操作是在一个so中执行的，脱壳时应用会自动加载该so，这样，就算脱壳时出了bug也可以直接修改这个so，避免重新刷机。
+Android代码是开源的，那么通过直接修改Android源码，把运行时的所有dex数据dump出来，不就可以实现一个通用的脱壳机了吗？FUPk3就是基于上面的思路来实现的。FUPK3需要修改Android源码，导出数据接口.不过，最为核心的脱壳操作是在一个so中执行的，脱壳时应用会自动加载该so，这样好处在于可以通过替换这个so来达到动态修bug的效果。
 
 1. 代码注入
 > 程序启动后读取配置文件/data/local/tmp/FUpk3.txt,如果命中脱壳的配置就会直接加载so /data/local/tmp/libFupk3.so，进行脱壳。修改Android源码
@@ -14,7 +14,7 @@ try {
 ```
 2. cookie
 
-> 脱壳需要知道app当前加载的所有dex文件。每一个被加载到内存中的dex文件都会被记录为一个cookie值，存放在程序的loader中,所有类的加载都需要通过该loader进行。Java层的loader可能会比较复杂，比如会用到双亲委派机制等，不太好遍历。但是，到了Jni层，一切都简单起来了，在native中，是通过一个Hash表来存储所有dex文件的。
+> 脱壳需要知道app当前加载的所有dex文件。每一个被加载到内存中的dex文件都会被记录为一个cookie值，存放在程序的loader中,所有类的加载都需要通过该loader进行。Java层的loader可能会比较复杂，比如会用到双亲委派机制等，不好遍历。但是，到了Jni层，一切都变得简单起来，在native中，会通过一个Hash表来存储所有dex文件。
 ```
 // 每个打开的dex文件都会存储到gDvm.userDexFiles中
 static void addToDexFileTable(DexOrJar* pDexOrJar) {
@@ -41,7 +41,7 @@ HashTable* dvmGetUserDexFiles() {
     return gDvm.userDexFiles;
 }
 ```
-> 然后，直接在so里面调用接口,这样就可以取出所有dex文件的内存布局了。
+> 然后，直接在so里面调用接口,就可以取出所有dex文件的内存布局。
 ```
 auto fn = (HashTable* (*)())dlsym(libdvm, "dvmGetUserDexFiles");
 if (fn == nullptr) {
@@ -50,7 +50,7 @@ if (fn == nullptr) {
 gDvmUserDexFiles = fn();
 ```
 3. dex重建
-> dex文件被加载起来后，一些值就不会再用到了。如文件头sig，数据偏移等，部分壳会把这些数据抹除。这些数据直接从应用的运行时数据 DvmDex, ClassObject, MethodObject等取出来就好,对数据进行重建。还有一些常量数据，StringPool,TypePool等，这些是不会加密的，直接dump出来。
+> dex文件被加载起来后，一些值就不会再被用到,如文件头sig，数据偏移等，部分壳会把这些数据抹除。这些数据需要直接从应用的运行时数据 DvmDex, ClassObject, MethodObject等取出来,并进行重建。还有一些常量数据，StringPool,TypePool等，这些是不会加密的，直接dump出来。
 ```
 bool DexDumper::fixDexHeader() {
     DexFile *pDexFile = mDvmDex->pDexFile;
@@ -181,7 +181,7 @@ size_t myfwrite(const void* buffer, size_t size, size_t count, FILE* stream) {
 > Android加固发展到现在，经历了好几个大版本改动。最初的是dex整体加固，现在的是VMP加固，中间出了不少非常不错的脱壳机，其中最为经典的有2个:ZjDroid与dexHunter，这两个都是开源的，并且写得非常好，即使是放到今天来看，也具有相当的参考价值,想要学习脱壳的同学们可以拜读一下。另外，FUpk3是运行在dalvik上的，那么要在art下脱壳怎么办呢？道理还是一样的，只是art下会复杂很多, 跑解析的跑编译的都有，修复起来需要记录很多数据，这里由于某些原因就不公开art下的脱壳机了。
 
 6. 写在最后
-> 新手想要入门，需要什么？1. 一台谷歌亲儿子 2. 一个Ubuntu系统 3. 一套完整的Android源码。平时有事没事可以多看看源码,刷刷机之类的。Android平台与Windows上的不同，到目前为止，Android上系统的优秀的教材实在是少，如果没人手把手地带入门的话，基本上就是在白做功，幸好大部分难点的解决方案答案都可以在源码里面找到，多熟悉一下总会有好处的。
+> 新手想要入门，需要什么？1. 一台谷歌亲儿子(nexus) 2. 一个Ubuntu系统 3. 一套完整的Android源码。平时有事没事可以多看看源码,刷刷机之类的。Android平台与Windows上的不同，到目前为止，Android上系统的优秀的教材实在是少，如果没人手把手地带入门的话，基本上就是在白做功，幸好大部分难点的解决方案答案都可以在源码里面找到，多熟悉一下总会有好处的。
 
 
 
