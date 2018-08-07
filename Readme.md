@@ -1,6 +1,19 @@
 # FUPK3 - The Android unpacker v3 by F8LEFT
 FUPK v3, 早期的一个Android半自动脱壳机。基于Android 系统 KTU84P (4.4.4_r1)开发，可以脱没被V掉的smali函数。目前市面上的壳基本上都可以过掉，使用前记得先修改一下特征，比如导出的函数接名称，用到的配置文件名称，包名，脱壳魔数等。
-
+## 安装
+目前只支持Nexus5 hammerhead手机，其他机型请参考下面的编译选项
+另外刷机有风险，操作需谨慎.
+1. 下载release中的fupk3.apk，hammerhead.zip, upkserver-2.2.3-dev-fat.jar
+2. 连接手机并进行刷机
+```
+adb reboot bootloader
+fastboot -w update hammerhead.zip
+```
+3. root手机
+4. 安装fupk3.apk
+```
+adb install fupk3.apk
+```
 ## 编译
 1. 编译系统源码
 ```
