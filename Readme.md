@@ -36,4 +36,5 @@ Root手机（Root方法自行搜索）
 3. 对截取出来的数据进行重组，生成dex文件。
 4. 利用修改过的smali/baksmali对dump下来的dex文件进行修复
 5. Android修改过的源码额外记录为patch了，自行查看吧。
+6. 更详细的内容看Other.md文件
 
